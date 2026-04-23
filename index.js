@@ -1,9 +1,15 @@
-import os
+import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes, MessageHandler, filters
 
-# Получаем токен из переменных окружения
-TELEGRAM_TOKEN = os.environ.get('TELEGRAM_TOKEN')
+# Логирование
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO
+)
+
+# Токен бота (использовать осторожно!)
+TELEGRAM_TOKEN = "8377374383:AAEshDX55M6WF5ZQR0yRv1sJXr7JoSjfUiA"
 
 # Темы
 topics = ['Школа', 'Еда', 'Природа', 'Семья', 'Космос', 'Город']
@@ -52,21 +58,13 @@ async def handle_topic(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif function == 'Грамматика':
         await query.message.reply_text(f"Объясняем грамматику по теме {topic}.")
     elif function == 'Сложная грамматика':
-        await query.message.reply_text(
-            f"Объяснение сложной грамматики по теме {topic} с примерами и таблицами."
-        )
+        await query.message.reply_text(f"Объяснение сложной грамматики по теме {topic} с примерами и таблицами.")
     elif function == 'Тренировка диалога':
-        await query.message.reply_text(
-            f"Начнем диалог на тему {topic}. Я буду исправлять ошибки."
-        )
+        await query.message.reply_text(f"Начнем диалог на тему {topic}. Я буду исправлять ошибки.")
     elif function == 'Расширение словарного запаса':
-        await query.message.reply_text(
-            f"Составляем список новых слов и мини-тест по теме {topic}."
-        )
+        await query.message.reply_text(f"Составляем список новых слов и мини-тест по теме {topic}.")
     elif function == 'Проверка эссе':
-        await query.message.reply_text(
-            f"Отправьте текст на казахском для проверки и улучшения стиля."
-        )
+        await query.message.reply_text(f"Отправьте текст на казахском для проверки и улучшения стиля.")
 
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.message.from_user.id
@@ -77,7 +75,6 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     topic = user_state[user_id]['topic']
     text = update.message.text
 
-    # Примеры ответов (для реальной интеграции сюда можно подключить OpenAI API)
     if function == 'Перевод':
         await update.message.reply_text(f"Перевод '{text}' на казахский: [пример перевода]")
     elif function in ['Грамматика', 'Сложная грамматика']:
