@@ -18,65 +18,24 @@ const TOPICS = [
   ["🚀 Космос", "🏙 Город"]
 ];
 
-// слова по темам
+// слова
 const WORDS = {
-  "🏫 Школа": [
-    "мектеп — школа",
-    "мұғалім — учитель",
-    "оқушы — ученик",
-    "сынып — класс",
-    "кітап — книга"
-  ],
-  "👨‍👩‍👧 Семья": [
-    "ана — мама",
-    "әке — папа",
-    "аға — брат",
-    "әпке — сестра",
-    "отбасы — семья"
-  ],
-  "🍎 Еда": [
-    "нан — хлеб",
-    "су — вода",
-    "ет — мясо",
-    "алма — яблоко",
-    "шай — чай"
-  ],
-  "🌿 Природа": [
-    "ағаш — дерево",
-    "гүл — цветок",
-    "орман — лес",
-    "өзен — река",
-    "күн — солнце"
-  ],
-  "🚀 Космос": [
-    "ғарыш — космос",
-    "жұлдыз — звезда",
-    "ай — луна",
-    "жер — земля",
-    "ракета — ракета"
-  ],
-  "🏙 Город": [
-    "қала — город",
-    "көше — улица",
-    "үй — дом",
-    "дүкен — магазин",
-    "мектеп — школа"
-  ]
+  "🏫 Школа": ["мектеп — школа", "мұғалім — учитель", "оқушы — ученик"],
+  "👨‍👩‍👧 Семья": ["ана — мама", "әке — папа", "отбасы — семья"],
+  "🍎 Еда": ["нан — хлеб", "су — вода", "алма — яблоко"],
+  "🌿 Природа": ["ағаш — дерево", "гүл — цветок", "күн — солнце"],
+  "🚀 Космос": ["ғарыш — космос", "ай — луна", "жұлдыз — звезда"],
+  "🏙 Город": ["қала — город", "көше — улица", "үй — дом"]
 };
 
 // тесты
 const TESTS = {
   "🏫 Школа": [
-    {
-      question: "мектеп деген не?",
-      options: ["A) школа", "Б) вода", "В) еда", "Г) космос"],
-      correct: "A"
-    },
-    {
-      question: "мұғалім деген не?",
-      options: ["A) ученик", "Б) учитель", "В) книга", "Г) дом"],
-      correct: "Б"
-    }
+    { q: "мектеп деген не?", a: "A", options: ["A) школа", "Б) вода", "В) еда"] },
+    { q: "мұғалім деген не?", a: "Б", options: ["A) ученик", "Б) учитель", "В) книга"] }
+  ],
+  "👨‍👩‍👧 Семья": [
+    { q: "ана деген не?", a: "A", options: ["A) мама", "Б) папа", "В) школа"] }
   ]
 };
 
@@ -85,7 +44,7 @@ bot.onText(/\/start/, (msg) => {
   bot.sendMessage(msg.chat.id,
 `Сәлем!👋🏻
 Мен AI_Barvin_Til_Bot🇰🇿
-Саған қазақ тілін қызықты, әрі тез үйренуге көмектесемін🙌
+Саған қазақ тілін үйренуге көмектесемін🙌
 Режимді таңда 👇`,
   {
     reply_markup: {
@@ -95,16 +54,16 @@ bot.onText(/\/start/, (msg) => {
   });
 });
 
-// основной обработчик
+// обработка сообщений
 bot.on("message", (msg) => {
   const chatId = msg.chat.id;
   const text = msg.text;
 
-  const allModes = MODES.flat();
-  const allTopics = TOPICS.flat();
+  const modes = MODES.flat();
+  const topics = TOPICS.flat();
 
   // выбор режима
-  if (allModes.includes(text)) {
+  if (modes.includes(text)) {
     userState[chatId] = { mode: text };
 
     bot.sendMessage(chatId, "Тақырыпты таңда👇", {
@@ -116,122 +75,86 @@ bot.on("message", (msg) => {
     return;
   }
 
-  // === ПРОВЕРКА ТЕСТА ===
-  if (userState[chatId]?.mode === "🧠 Тест" && userState[chatId].questions) {
+  // проверка теста
+  if (userState[chatId]?.mode === "🧠 Тест" && userState[chatId].test) {
     const state = userState[chatId];
-    const q = state.questions[state.testStep];
+    const q = state.test[state.step];
 
-    const answer = text.toUpperCase();
-
-    if (answer.includes(q.correct)) {
+    if (text.toUpperCase().includes(q.a)) {
       state.score++;
       bot.sendMessage(chatId, "Дұрыс! 👍");
     } else {
-      bot.sendMessage(chatId, `Қате 😅 Дұрыс жауап: ${q.correct}`);
+      bot.sendMessage(chatId, `Қате 😅 Дұрыс жауап: ${q.a}`);
     }
 
-    state.testStep++;
+    state.step++;
 
-    if (state.testStep < state.questions.length) {
+    if (state.step < state.test.length) {
       sendQuestion(chatId);
     } else {
-      bot.sendMessage(chatId,
-        `🎯 Нәтиже: ${state.score}/${state.questions.length}\nЖарайсың! 👍`
-      );
+      bot.sendMessage(chatId, `🎯 Нәтиже: ${state.score}/${state.test.length}`);
       delete userState[chatId];
     }
-
     return;
   }
 
   // выбор темы
-  if (allTopics.includes(text)) {
+  if (topics.includes(text)) {
     const mode = userState[chatId]?.mode;
 
-    // 📘 слова
+    // слова
     if (mode === "📘 Перевод слов") {
-      const words = WORDS[text] || [];
-
-      bot.sendMessage(chatId,
-        `📚 Тақырып: ${text}\n\n` + words.join("\n") + "\n\nЖарайсың! 👍"
-      );
+      const words = WORDS[text] || ["Сөздер жоқ"];
+      bot.sendMessage(chatId, words.join("\n"));
     }
 
-    // 🧠 тест
+    // тест
     if (mode === "🧠 Тест") {
-      userState[chatId].testStep = 0;
+      const test = TESTS[text];
+      if (!test) {
+        bot.sendMessage(chatId, "Бұл тақырыпта тест жоқ");
+        return;
+      }
+
+      userState[chatId].test = test;
+      userState[chatId].step = 0;
       userState[chatId].score = 0;
-      userState[chatId].questions = TESTS[text];
 
       sendQuestion(chatId);
     }
 
-    // 📝 составление
+    // составление
     if (mode === "📝 Составление") {
-      bot.sendMessage(chatId,
-`📝 Сөздер:
-мен, мектеп, барамын
-
-Сөйлем құрастыр 👇`);
+      bot.sendMessage(chatId, "Сөздер: мен, барамын, мектеп");
     }
 
-    // 🔄 соответствие
+    // соответствие
     if (mode === "🔄 Соответствие") {
-      bot.sendMessage(chatId,
-`🔄 Сәйкестендір:
-
-1) мектеп  
-2) кітап  
-
-A) книга  
-B) школа  
-
-Жауап бер (1-B, 2-A)`);
+      bot.sendMessage(chatId, "1 мектеп - A школа");
     }
 
-    // 💬 диалог
+    // диалог
     if (mode === "💬 Диалог") {
-      userState[chatId].dialogStep = 1;
-
-      bot.sendMessage(chatId,
-`💬 Диалог:
-
-Сәлем! Сен мектепке барасың ба?`);
+      userState[chatId].dialog = 1;
+      bot.sendMessage(chatId, "Сәлем! Сен мектепке барасың ба?");
     }
 
     return;
   }
 
-  // 💬 диалог продолжение
-  if (userState[chatId]?.mode === "💬 Диалог") {
-    const step = userState[chatId].dialogStep;
-
-    if (step === 1) {
-      bot.sendMessage(chatId, "Жақсы 👍 Сен қай сыныпта оқисың?");
-      userState[chatId].dialogStep = 2;
-      return;
-    }
-
-    if (step === 2) {
-      bot.sendMessage(chatId, "Керемет 😊 Қай пәнді жақсы көресің?");
-      userState[chatId].dialogStep = 3;
-      return;
-    }
-
-    if (step === 3) {
-      bot.sendMessage(chatId, "Жарайсың! 👍 Диалог аяқталды 🎉");
-      delete userState[chatId];
-      return;
-    }
+  // диалог
+  if (userState[chatId]?.dialog) {
+    bot.sendMessage(chatId, "Жарайсың! 👍 Тағы жауап бер 😊");
+    return;
   }
 });
 
 // функция вопроса
 function sendQuestion(chatId) {
   const state = userState[chatId];
-  const q = state.questions[state.testStep];
+  const q = state.test[state.step];
 
   bot.sendMessage(chatId,
-    `🧠 Вопрос ${state.testStep + 1}:\n${q.question}\n\n${q.options.join("\n")}`
+    `${q.q}\n\n${q.options.join("\n")}`
   );
 }
