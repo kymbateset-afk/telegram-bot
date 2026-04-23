@@ -1,32 +1,100 @@
-Ты — искусственный интеллект, обученный помогать пользователям изучать казахский язык. 
-Отвечай грамотно, понятно и дружелюбно, мотивируй пользователя учиться.  
+import os
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes, MessageHandler, filters
 
-### Основные функции бота (кнопки):
-1. **Перевод** — переводи слова и фразы между казахским и выбранным языком.
-2. **Тест** — предложи небольшой тест по словарю или грамматике.
-3. **Грамматика** — объясняй правила казахской грамматики с примерами.
-4. **Соответствие** — помогай сопоставлять слова и их значения.
-5. **Диалог** — веди интерактивный диалог с пользователем на выбранную тему.
-6. **Составление** — помогай составлять предложения или короткие тексты по теме.
-7. **Объяснение сложной грамматики** — подробные объяснения с примерами и таблицами.  
-   Запрос: «Объясни тему <тема> просто и понятно, как ученице 8 класса. Приведи примеры с забавными предложениями и составь таблицу для быстрого запоминания».
-8. **Тренировка диалога (Разрушение барьера)** — практика речи в реальных ситуациях.  
-   Запрос: «Давай поиграем. Ты — <роль>, а я — <роль>. Начинай диалог, исправляй мои ошибки в скобках, если они будут, и продолжай общение».
-9. **Расширение словарного запаса** — учимся через интересные примеры.  
-   Запрос: «Составь список из 15 полезных слов и фраз на тему '<тема>' на казахском языке. Для каждого слова придумай одно интересное предложение. В конце составь короткий тест из 5 вопросов».
-10. **Проверка эссе и стиля** — проверка и улучшение текста.  
-    Запрос: «Я напишу текст на казахском языке. Проверь его на грамматические ошибки, затем перепиши его так, чтобы он звучал красиво и естественно на казахском языке».
+# Получаем токен из переменных окружения
+TELEGRAM_TOKEN = os.environ.get('TELEGRAM_TOKEN')
 
-### Темы для кнопок:
-- Школа
-- Еда
-- Природа
-- Семья
-- Космос
-- Город
+# Темы
+topics = ['Школа', 'Еда', 'Природа', 'Семья', 'Космос', 'Город']
 
-### Правила поведения бота:
-- После выбора функции и темы предоставляй конкретное задание или объяснение.
-- Используй короткие, понятные объяснения и примеры.
-- Поддерживай дружелюбный тон, мотивируй пользователя исправлять ошибки.
-- Если пользователь вводит текст без выбора кнопки, предложи выбрать функцию и тему.
+# Функции
+functions = [
+    'Перевод', 'Тест', 'Грамматика', 'Соответствие', 'Диалог', 'Составление',
+    'Сложная грамматика', 'Тренировка диалога', 'Расширение словарного запаса', 'Проверка эссе'
+]
+
+# Хранение состояния пользователя
+user_state = {}
+
+def build_keyboard(options):
+    keyboard = [[InlineKeyboardButton(opt, callback_data=opt)] for opt in options]
+    return InlineKeyboardMarkup(keyboard)
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        "Привет! Я помогу тебе изучать казахский язык. Выбери функцию:",
+        reply_markup=build_keyboard(functions)
+    )
+
+async def handle_function(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    function = query.data
+    user_state[query.from_user.id] = {'function': function}
+    await query.message.reply_text(
+        f"Вы выбрали функцию: {function}. Теперь выбери тему:",
+        reply_markup=build_keyboard(topics)
+    )
+
+async def handle_topic(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    topic = query.data
+    user_state[query.from_user.id]['topic'] = topic
+    function = user_state[query.from_user.id]['function']
+    await query.message.reply_text(f"Функция: {function}, Тема: {topic}")
+
+    if function == 'Перевод':
+        await query.message.reply_text("Напиши слово или фразу для перевода.")
+    elif function == 'Тест':
+        await query.message.reply_text(f"Начнем тест по теме {topic}.")
+    elif function == 'Грамматика':
+        await query.message.reply_text(f"Объясняем грамматику по теме {topic}.")
+    elif function == 'Сложная грамматика':
+        await query.message.reply_text(
+            f"Объяснение сложной грамматики по теме {topic} с примерами и таблицами."
+        )
+    elif function == 'Тренировка диалога':
+        await query.message.reply_text(
+            f"Начнем диалог на тему {topic}. Я буду исправлять ошибки."
+        )
+    elif function == 'Расширение словарного запаса':
+        await query.message.reply_text(
+            f"Составляем список новых слов и мини-тест по теме {topic}."
+        )
+    elif function == 'Проверка эссе':
+        await query.message.reply_text(
+            f"Отправьте текст на казахском для проверки и улучшения стиля."
+        )
+
+async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.message.from_user.id
+    if user_id not in user_state:
+        await update.message.reply_text("Сначала выбери функцию через /start")
+        return
+    function = user_state[user_id]['function']
+    topic = user_state[user_id]['topic']
+    text = update.message.text
+
+    # Примеры ответов (для реальной интеграции сюда можно подключить OpenAI API)
+    if function == 'Перевод':
+        await update.message.reply_text(f"Перевод '{text}' на казахский: [пример перевода]")
+    elif function in ['Грамматика', 'Сложная грамматика']:
+        await update.message.reply_text(f"Объяснение грамматики для '{text}' по теме {topic}")
+    elif function == 'Тренировка диалога':
+        await update.message.reply_text(f"Продолжаем диалог на тему {topic}: [пример]")
+    elif function == 'Расширение словарного запаса':
+        await update.message.reply_text(f"Слова и мини-тест по теме {topic}: [пример]")
+    elif function == 'Проверка эссе':
+        await update.message.reply_text(f"Проверка текста: '{text}' [пример исправлений]")
+    else:
+        await update.message.reply_text(f"Вы выбрали '{text}' для функции {function}")
+
+if __name__ == '__main__':
+    app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CallbackQueryHandler(handle_function, pattern='^(' + '|'.join(functions) + ')$'))
+    app.add_handler(CallbackQueryHandler(handle_topic, pattern='^(' + '|'.join(topics) + ')$'))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
+    app.run_polling()
