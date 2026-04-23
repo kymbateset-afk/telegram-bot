@@ -1,60 +1,23 @@
-const TelegramBot = require('node-telegram-bot-api');
+if (allTopics.includes(text)) {
+    userState[chatId].topic = text;
 
-const token = process.env.TELEGRAM_BOT_TOKEN;
-const bot = new TelegramBot(token, { polling: true });
+    // Генерация слов по теме через OpenAI
+    const prompt = `Составь список из 7-10 полезных слов на тему "${text}" на казахском языке. Для каждого слова приведи короткий пример предложения.`;
 
-// Режимы
-const MODES = [
-  ["📘 Перевод слов", "🧠 Тест"],
-  ["📝 Составление", "🔄 Соответствие"],
-  ["💬 Диалог"]
-];
+    try {
+        const response = await openai.createChatCompletion({
+            model: "gpt-3.5-turbo",
+            messages: [{ role: "user", content: prompt }],
+            max_tokens: 300
+        });
 
-// Темы
-const TOPICS = [
-  ["🏫 Школа", "👨‍👩‍👧 Семья"],
-  ["🌿 Природа", "🍎 Еда"],
-  ["🚀 Космос", "🏙 Город"]
-];
+        const wordsList = response.data.choices[0].message.content;
+        bot.sendMessage(chatId, `📚 Тема: ${text}\nВот список слов и примеры:\n${wordsList}\n\nТеперь можешь писать слова или фразы для перевода, диалога или других функций.`);
 
-const userState = {};
-
-bot.onText(/\/start/, (msg) => {
-  bot.sendMessage(msg.chat.id,
-`Сәлем!👋🏻
-Мен AI_Barvin_Til_Bot🇰🇿
-Саған қазақ тілін қызықты, әрі тез үйренуге көмектесемін🙌
-Дайын болсаң, «start» батырмасын бас!
-Сәттілік!`,
-  {
-    reply_markup: {
-      keyboard: MODES,
-      resize_keyboard: true
+    } catch (err) {
+        console.error(err);
+        bot.sendMessage(chatId, "Ошибка AI при генерации слов. Попробуй снова.");
     }
-  });
-});
 
-bot.on("message", (msg) => {
-  const chatId = msg.chat.id;
-  const text = msg.text;
-
-  const allModes = MODES.flat();
-  const allTopics = TOPICS.flat();
-
-  if (allModes.includes(text)) {
-    userState[chatId] = { mode: text };
-
-    bot.sendMessage(chatId, "Тақырыпты таңда👇", {
-      reply_markup: {
-        keyboard: TOPICS,
-        resize_keyboard: true
-      }
-    });
     return;
-  }
-
-  if (allTopics.includes(text)) {
-    bot.sendMessage(chatId, `📚 Тақырып: ${text}`);
-    return;
-  }
-});
+}
