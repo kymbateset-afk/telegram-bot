@@ -1,111 +1,160 @@
 const TelegramBot = require('node-telegram-bot-api');
+const OpenAI = require('openai');
+
 const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: true });
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY
+});
 
 const userState = {};
 
-// уровни
-const LEVELS = {
-  1: [
-    { q: "нан деген не?", options: ["A) хлеб", "Б) вода", "В) дом"], correct: "A" },
-    { q: "су деген не?", options: ["A) школа", "Б) вода", "В) мясо"], correct: "Б" }
-  ],
-  2: [
-    { q: "мектеп деген не?", options: ["A) школа", "Б) еда", "В) лес"], correct: "A" }
-  ]
-};
 
-// 🚀 старт
+// 🚀 СТАРТ
 bot.onText(/\/start/, (msg) => {
-  const chatId = msg.chat.id;
+  bot.sendMessage(msg.chat.id,
+`Сәлем!👋🏻
+Мен AI_Barvin_Til_Bot🇰🇿
 
-  userState[chatId] = {
-    level: 1,
-    step: 0,
-    score: 0
-  };
-
-  bot.sendMessage(chatId,
-`Сәлем!👋🏻  
-Duolingo режимі 🎮  
-
-Бастаймыз!`,
-    {
-      reply_markup: {
-        inline_keyboard: [
-          [{ text: "🚀 Начать", callback_data: "start_game" }]
+Қазақ тілін үйренейік 🚀`,
+  {
+    reply_markup: {
+      inline_keyboard: [
+        [
+          { text: "📘 Перевод слов", callback_data: "words" },
+          { text: "🧠 Тест", callback_data: "test" }
+        ],
+        [
+          { text: "💬 Диалог", callback_data: "dialog" }
         ]
-      }
+      ]
     }
-  );
+  });
 });
 
-// 🚀 кнопки
-bot.on("callback_query", (query) => {
+
+// 🚀 КНОПКИ
+bot.on("callback_query", async (query) => {
   const chatId = query.message.chat.id;
   const data = query.data;
 
-  const state = userState[chatId];
+  // выбор режима
+  if (["words","test","dialog"].includes(data)) {
+    userState[chatId] = { mode: data };
 
-  // старт игры
-  if (data === "start_game") {
-    sendQuestion(chatId);
+    bot.editMessageText("Тақырыпты таңда 👇", {
+      chat_id: chatId,
+      message_id: query.message.message_id,
+      reply_markup: {
+        inline_keyboard: [
+          [
+            { text: "🏫 Школа", callback_data: "school" },
+            { text: "👨‍👩‍👧 Семья", callback_data: "family" }
+          ],
+          [
+            { text: "🍎 Еда", callback_data: "food" },
+            { text: "🌿 Природа", callback_data: "nature" }
+          ],
+          [
+            { text: "⬅️ Назад", callback_data: "back" }
+          ]
+        ]
+      }
+    });
   }
 
-  // ответ
-  if (["A","Б","В"].includes(data)) {
-    const q = LEVELS[state.level][state.step];
+  // назад
+  if (data === "back") {
+    bot.sendMessage(chatId, "Режимді таңда 👇", {
+      reply_markup: {
+        inline_keyboard: [
+          [
+            { text: "📘 Перевод слов", callback_data: "words" },
+            { text: "🧠 Тест", callback_data: "test" }
+          ],
+          [
+            { text: "💬 Диалог", callback_data: "dialog" }
+          ]
+        ]
+      }
+    });
+  }
 
-    if (data === q.correct) {
-      state.score++;
+  const state = userState[chatId];
+
+  // 📘 СЛОВА (AI)
+  if (state?.mode === "words") {
+    const res = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [{
+        role: "user",
+        content: `Дай 7 слов на казахском по теме "${data}" с переводом`
+      }]
+    });
+
+    bot.sendMessage(chatId, res.choices[0].message.content);
+  }
+
+  // 🧠 ТЕСТ
+  if (state?.mode === "test") {
+    userState[chatId].answer = "A";
+
+    bot.sendMessage(chatId,
+`🧠 Вопрос:
+
+"нан" деген не?`,
+    {
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: "A) хлеб", callback_data: "A" }],
+          [{ text: "Б) вода", callback_data: "Б" }],
+          [{ text: "В) дом", callback_data: "В" }]
+        ]
+      }
+    });
+  }
+
+  // проверка теста
+  if (["A","Б","В"].includes(data)) {
+    if (data === userState[chatId].answer) {
       bot.sendMessage(chatId, "Дұрыс! 👍");
     } else {
-      bot.sendMessage(chatId, `Қате 😅 Дұрыс жауап: ${q.correct}`);
+      bot.sendMessage(chatId, "Қате 😅");
     }
+  }
 
-    state.step++;
+  // 💬 ДИАЛОГ (AI)
+  if (state?.mode === "dialog") {
+    userState[chatId].dialog = true;
 
-    if (state.step < LEVELS[state.level].length) {
-      sendQuestion(chatId);
-    } else {
-      bot.sendMessage(chatId,
-`🎯 Уровень ${state.level} завершён!
-⭐ Очки: ${state.score}/${LEVELS[state.level].length}`);
+    const res = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [{
+        role: "user",
+        content: `Начни простой диалог на казахском по теме "${data}"`
+      }]
+    });
 
-      state.level++;
-      state.step = 0;
-      state.score = 0;
-
-      bot.sendMessage(chatId,
-`➡️ Перейти на уровень ${state.level}?`,
-        {
-          reply_markup: {
-            inline_keyboard: [
-              [{ text: "Дальше 🚀", callback_data: "start_game" }]
-            ]
-          }
-        }
-      );
-    }
+    bot.sendMessage(chatId, res.choices[0].message.content);
   }
 
   bot.answerCallbackQuery(query.id);
 });
 
-// 🚀 вопрос
-function sendQuestion(chatId) {
-  const state = userState[chatId];
-  const q = LEVELS[state.level][state.step];
 
-  bot.sendMessage(chatId,
-`📘 Уровень ${state.level}
+// 💬 ПРОДОЛЖЕНИЕ ДИАЛОГА
+bot.on("message", async (msg) => {
+  const chatId = msg.chat.id;
 
-${q.q}`,
-    {
-      reply_markup: {
-        inline_keyboard: q.options.map(opt => [
-          { text: opt, callback_data: opt[0] }
-        ])
-      }
-    }
-  );
-}
+  if (userState[chatId]?.dialog) {
+    const res = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [{
+        role: "user",
+        content: `Ответь ученику на казахском: ${msg.text}`
+      }]
+    });
+
+    bot.sendMessage(chatId, res.choices[0].message.content);
+  }
+});
