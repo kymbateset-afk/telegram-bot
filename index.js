@@ -1,150 +1,87 @@
 const TelegramBot = require('node-telegram-bot-api');
-
 const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: true });
 
 const userState = {};
 
-// 📌 СТАРТ
-bot.onText(/\/start/, (msg) => {
-  bot.sendMessage(msg.chat.id,
-`Сәлем!👋🏻
-Мен AI_Barvin_Til_Bot🇰🇿
-Қазақ тілін бірге үйренейік 🚀
+// уровни
+const LEVELS = {
+  1: [
+    { q: "нан деген не?", options: ["A) хлеб", "Б) вода", "В) дом"], correct: "A" },
+    { q: "су деген не?", options: ["A) школа", "Б) вода", "В) мясо"], correct: "Б" }
+  ],
+  2: [
+    { q: "мектеп деген не?", options: ["A) школа", "Б) еда", "В) лес"], correct: "A" }
+  ]
+};
 
-Режимді таңда 👇`,
-  {
-    reply_markup: {
-      inline_keyboard: [
-        [
-          { text: "📘 Перевод слов", callback_data: "words" },
-          { text: "🧠 Тест", callback_data: "test" }
-        ],
-        [
-          { text: "📝 Составление", callback_data: "compose" },
-          { text: "🔄 Соответствие", callback_data: "match" }
-        ],
-        [
-          { text: "💬 Диалог", callback_data: "dialog" }
+// 🚀 старт
+bot.onText(/\/start/, (msg) => {
+  const chatId = msg.chat.id;
+
+  userState[chatId] = {
+    level: 1,
+    step: 0,
+    score: 0
+  };
+
+  bot.sendMessage(chatId,
+`Сәлем!👋🏻  
+Duolingo режимі 🎮  
+
+Бастаймыз!`,
+    {
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: "🚀 Начать", callback_data: "start_game" }]
         ]
-      ]
+      }
     }
-  });
+  );
 });
 
-
-// 📌 КНОПКИ
+// 🚀 кнопки
 bot.on("callback_query", (query) => {
   const chatId = query.message.chat.id;
   const data = query.data;
 
-  // выбор режима
-  if (["words","test","compose","match","dialog"].includes(data)) {
-    userState[chatId] = { mode: data };
-
-    bot.editMessageText("Тақырыпты таңда 👇", {
-      chat_id: chatId,
-      message_id: query.message.message_id,
-      reply_markup: {
-        inline_keyboard: [
-          [
-            { text: "🏫 Школа", callback_data: "school" },
-            { text: "👨‍👩‍👧 Семья", callback_data: "family" }
-          ],
-          [
-            { text: "🌿 Природа", callback_data: "nature" },
-            { text: "🍎 Еда", callback_data: "food" }
-          ],
-          [
-            { text: "🚀 Космос", callback_data: "space" },
-            { text: "🏙 Город", callback_data: "city" }
-          ],
-          [
-            { text: "⬅️ Назад", callback_data: "back" }
-          ]
-        ]
-      }
-    });
-  }
-
-  // назад
-  if (data === "back") {
-    bot.editMessageText("Режимді таңда 👇", {
-      chat_id: chatId,
-      message_id: query.message.message_id,
-      reply_markup: {
-        inline_keyboard: [
-          [
-            { text: "📘 Перевод слов", callback_data: "words" },
-            { text: "🧠 Тест", callback_data: "test" }
-          ],
-          [
-            { text: "📝 Составление", callback_data: "compose" },
-            { text: "🔄 Соответствие", callback_data: "match" }
-          ],
-          [
-            { text: "💬 Диалог", callback_data: "dialog" }
-          ]
-        ]
-      }
-    });
-  }
-
-  // темы
-  const WORDS = {
-    school: ["мектеп — школа", "мұғалім — учитель"],
-    family: ["ана — мама", "әке — папа"],
-    food: ["нан — хлеб", "су — вода"],
-    nature: ["ағаш — дерево", "гүл — цветок"],
-    space: ["ай — луна", "жұлдыз — звезда"],
-    city: ["қала — город", "үй — дом"]
-  };
-
   const state = userState[chatId];
 
-  if (WORDS[data] && state) {
+  // старт игры
+  if (data === "start_game") {
+    sendQuestion(chatId);
+  }
 
-    // 📘 СЛОВА
-    if (state.mode === "words") {
-      bot.editMessageText(
-        `📚 Слова:\n\n${WORDS[data].join("\n")}`,
-        {
-          chat_id: chatId,
-          message_id: query.message.message_id,
-          reply_markup: {
-            inline_keyboard: [[{ text: "⬅️ Назад", callback_data: "back" }]]
-          }
-        }
-      );
+  // ответ
+  if (["A","Б","В"].includes(data)) {
+    const q = LEVELS[state.level][state.step];
+
+    if (data === q.correct) {
+      state.score++;
+      bot.sendMessage(chatId, "Дұрыс! 👍");
+    } else {
+      bot.sendMessage(chatId, `Қате 😅 Дұрыс жауап: ${q.correct}`);
     }
 
-    // 🧠 ТЕСТ
-    if (state.mode === "test") {
-      bot.editMessageText(
-        `🧠 Вопрос:\n\n"нан" деген не?\n\nA) хлеб\nБ) вода\nВ) дом`,
+    state.step++;
+
+    if (state.step < LEVELS[state.level].length) {
+      sendQuestion(chatId);
+    } else {
+      bot.sendMessage(chatId,
+`🎯 Уровень ${state.level} завершён!
+⭐ Очки: ${state.score}/${LEVELS[state.level].length}`);
+
+      state.level++;
+      state.step = 0;
+      state.score = 0;
+
+      bot.sendMessage(chatId,
+`➡️ Перейти на уровень ${state.level}?`,
         {
-          chat_id: chatId,
-          message_id: query.message.message_id,
           reply_markup: {
             inline_keyboard: [
-              [{ text: "A", callback_data: "A" }],
-              [{ text: "Б", callback_data: "Б" }],
-              [{ text: "В", callback_data: "В" }],
-              [{ text: "⬅️ Назад", callback_data: "back" }]
+              [{ text: "Дальше 🚀", callback_data: "start_game" }]
             ]
-          }
-        }
-      );
-    }
-
-    // 💬 ДИАЛОГ
-    if (state.mode === "dialog") {
-      bot.editMessageText(
-        `💬 Диалог:\n\nСәлем! Сен осы тақырыпты жақсы көресің бе?`,
-        {
-          chat_id: chatId,
-          message_id: query.message.message_id,
-          reply_markup: {
-            inline_keyboard: [[{ text: "⬅️ Назад", callback_data: "back" }]]
           }
         }
       );
@@ -153,3 +90,22 @@ bot.on("callback_query", (query) => {
 
   bot.answerCallbackQuery(query.id);
 });
+
+// 🚀 вопрос
+function sendQuestion(chatId) {
+  const state = userState[chatId];
+  const q = LEVELS[state.level][state.step];
+
+  bot.sendMessage(chatId,
+`📘 Уровень ${state.level}
+
+${q.q}`,
+    {
+      reply_markup: {
+        inline_keyboard: q.options.map(opt => [
+          { text: opt, callback_data: opt[0] }
+        ])
+      }
+    }
+  );
+}
